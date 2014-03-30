@@ -6,6 +6,7 @@ type Identifier(name:string) =
     let name:string = name
     member this.Name = name
     member this.Value(context:Context) = context.ValueOf(this)
+
 and Context = 
     val variables:Map<string,int>
     new()= {variables = Map.empty}
@@ -15,9 +16,6 @@ and Context =
         if this.variables.ContainsKey(i.Name)
         then this.variables.Item(i.Name)
         else failwith ("Invalid Identifier name: " + i.Name)
-
-
-
 
 type ArithExp = 
     | Var of Identifier
@@ -47,7 +45,6 @@ type BooleanExp =
         | Not(a) -> not(a.Value c)
         | And(a,b) -> a.Value c && b.Value c
 
-
 type Statement = 
     | Assignment of Identifier * ArithExp
     | Skip
@@ -64,6 +61,62 @@ type Statement =
             while (b.Value cur) do
                 cur <- s.Compute cur
             cur
+open System
+open System.Text.RegularExpressions
+
+let partition (s:string,p:Regex) =
+    let parts = p.Split(s,1)
+    if not(parts.Length >= 2) then failwith "partition error p:" p
+    else (parts.[0],parts.[1])
+
+let (|Equals|_|) x y = if x.Equals(y) then Some() else None
+let (|ParseRegex|_|) regex str =
+   let m = Regex(regex).Match(str)
+   if m.Success
+   then Some (List.tail [ for x in m.Groups -> x.Value ])
+   else None
+
+let parseArith (s:string) = 
+    Int 1
+
+let rec parseBool (s) = 
+    match s with
+    | ParseRegex "\s*(.*)\s*" [trim] -> parseBool trim
+    | Equals "true" () -> True
+    | Equals "false" () -> False
+    | ParseRegex "(.*)=(.*)" [left;right] -> Equals(parseArith left,parseArith right)
+    | ParseRegex "(.*)<=(.*)" [left;right] -> LTEquals(parseArith left,parseArith right)
+    | ParseRegex "(.*)^(.*)" [left;right] -> LTEquals(parseArith left,parseArith right)
+
+
+let ifRegex = Regex(@"(if\s*\((.*)\)\s*then\s*\((.*)\)\s*else\s*\((.*)\))")
+let whileRegex = Regex(@"(while\s*\((.*)\)\s*do\s*\((.*)\))")
+
+let rec parseStatement (s:string):Statement =
+    let s = s.Trim()
+    if s.Contains ";" then
+        let (s1,s2) = partition(s,Regex ("\\;"))
+        StatementConcat( parseStatement s1,parseStatement s2)
+    elif s.Equals "skip"  then Skip
+    elif s.Contains ":="  then
+        let (var,aexp) = partition (s,Regex ":=")
+        Assignment (Identifier var,parseArith aexp)
+    else 
+        let ifmatches = ifRegex.Match(s)
+        if ifmatches.Groups.Count > 0 then
+            if not(ifmatches.Groups.Count = 4) then failwith "if syntax error" s
+            let bExp = parseBool (ifmatches.Groups.Item(1).Value)
+            let strue = parseStatement (ifmatches.Groups.Item(2).Value)
+            let sfalse = parseStatement (ifmatches.Groups.Item(3).Value)
+            If(True,strue,sfalse)
+        else
+            let whilematches = whileRegex.Match(s)
+            if whilematches.Groups.Count > 0 then
+                if not(whilematches.Groups.Count = 3) then failwith "while syntax error" s
+                let bExp = parseBool (whilematches.Groups.Item(1).Value)
+                let s = parseStatement (whilematches.Groups.Item(2).Value)
+                While(bExp,s)
+            else failwith "unexpected syntax:" s
 
 
 let c = Context(Context(Context(),Identifier "x",1),Identifier "y",10)
@@ -77,7 +130,7 @@ let prog = While(
 open System.Diagnostics
 [<EntryPoint>]
 let main argv =
-
-    let result = prog.Compute c
+    //TODO: test ifRegex
+    //let result = prog.Compute c
     //Debug.WriteLine(result)
     1 // return an integer exit code
