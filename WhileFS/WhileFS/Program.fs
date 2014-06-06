@@ -48,6 +48,7 @@ type BooleanExp =
 type Statement = 
     | Assignment of Identifier * ArithExp
     | Skip
+    | Empty
     | StatementConcat of Statement * Statement
     | If of BooleanExp * Statement * Statement
     | While of BooleanExp * Statement
@@ -65,36 +66,33 @@ type Statement =
 
 open Parser
 
+
+
 // stub
-let parseArith t = [Parser.Token.StatementSeperator], ArithExp.Int(0)
-let parseBoolCondition t = [Parser.Token.StatementSeperator], BooleanExp.True 
-// stub; takes tokens returns tokens between ( and corresponding ) , rest
-let removeBrackets t = t,t
-// stub; tokens is (; statement) or [] else blow up; return statement
-let concatOrEnd s t = Statement.Skip
+let parseArith (t:Token list) = t.Tail, ArithExp.Int(0)
+let parseBool t = BooleanExp.True 
+
+
 
 let rec parseStatement = function
-    |   Parser.Token.Identifier(i) :: Parser.Token.Assignment :: t ->
-            let t', arith = parseArith t
-            concatOrEnd (Statement.Assignment(Identifier.String(i),arith)) t'
-    |   Parser.Token.While :: t ->
-            let t',bool = parseBoolCondition (removeBrackets t)
-            match t' with
-                | Parser.Token.Do :: t -> 
-                    let statetokens,rest = removeBrackets t
-                    let whilestate = parseStatement statetokens
-                    concatOrEnd (Statement.While(bool,whilestate)) rest
-                | _ -> failwith "expecting  'do'"
+    |   Identifier(x) :: Assignment :: t ->
+            let rest,arith = parseArith t
+            let newstmnt = Statement.Assignment(Identifier.String(x),arith) 
+            match rest with
+                | [] -> newstmnt
+                | StatementSeperator :: restrest -> StatementConcat(newstmnt,parseStatement restrest)
+    |   While :: Brackets(bool) :: Do :: Brackets(stmt) :: t ->
+            let newstmnt =Statement.While(parseBool bool,parseStatement stmt)
+            match t with
+                | [] -> newstmnt
+                | StatementSeperator :: restrest -> StatementConcat(newstmnt,parseStatement restrest)
     |   _ -> failwith "unexpected token"
+
 
 open System
 open System.Diagnostics
 [<EntryPoint>]
 let main argv =
-    //TODO: test ifRegex
-    //let result = prog.Compute c
-    //Debug.WriteLine(result)
-    //let test = parseArith "a+b+c*1"
-    let t = Parser.tokensWhile " x:=0;while (x<=10) do (x:=x+1)"
-    //let t = P
+    let tokens = Parser.tokensWhile "x:=0;while(x<=10) do ( x:=1)"
+    let stmt = parseStatement tokens
     1 // return an integer exit code

@@ -11,6 +11,7 @@ type Token =
     | LTEquals //
     | Do//
     | Addition //
+    | Brackets of Token list
 
 open System
 
@@ -57,6 +58,32 @@ let rec tokens acc = function
     | [] -> List.rev(acc)
     | _ -> failwith "tokenisation error"
 
+
+
+let removeBrackets tokens = 
+    let rec removeBrackets' level acc = function
+        |   Token.LBracket :: t -> removeBrackets' (level+1) (Token.LBracket :: acc) t
+        |   Token.Rbracket :: t when level = 1 -> (List.rev (Token.Rbracket::acc)),t
+        |   Token.Rbracket :: t -> removeBrackets' (level-1) (Token.Rbracket :: acc) t
+        |   a :: t -> removeBrackets' level (a :: acc) t
+        |   _ -> failwith "unmatched bracket"
+    let left,rest = removeBrackets' 0 [] tokens
+    let leftnobrackets = (left.Tail |> List.rev).Tail |> List.rev
+    leftnobrackets,rest
+
+let composeBrackets tokens = 
+    let rec cb acc = function
+        |   LBracket  :: t ->
+            let inside,rest = removeBrackets (LBracket::t)
+            cb (Brackets(cb [] inside)::acc) rest
+        |   Rbracket :: t -> failwith "unexpected rbracket"
+        |   a::t -> cb (a::acc) t
+        |   [] -> acc |> List.rev
+        //|   _ -> failwith "error"
+    cb [] tokens
+    
+
 let tokensWhile (s:string) = 
     let chars = List.ofArray(s.ToCharArray()) 
-    tokens [] chars
+    let toks = tokens [] chars
+    composeBrackets toks
