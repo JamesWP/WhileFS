@@ -171,8 +171,6 @@ let parseArith (t:Token list) =
 
 // fortunatley the grammar of the language will seperate the bool expressions into complete sections
 // so all the passed tokens are to be used or fail horribley...
-
-// x=<10
 let rec parseBool = function
     |   Token.True :: [] -> Syntax.BooleanExp.True
     |   Token.False :: [] -> Syntax.BooleanExp.False
