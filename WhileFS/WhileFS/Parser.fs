@@ -1,38 +1,51 @@
 ﻿// x:=0;while (x<=10) do (x:=x+1)
 module Parser
 type Token = 
-    | Identifier of string
+    
+    // statement
     | Assignment //
-    | Number of int//
     | StatementSeperator //
-    | While
+    | While //
     | LBracket //
     | Rbracket //
-    | LTEquals //
     | Do//
+    | If//
+    | Else //
+    | Then //
+    | Skip //
+
+    // arith
+    | Identifier of string //
     | Addition //
+    | Subtraction //
+    | Multiply //
+    | Number of int//
+    
+    // bools
+    | LTEquals //
+    | True//
+    | False//
+    | Equals//
+    | Not//
+    | And//
+
+     
+    
+    // added in after extra lex step
     | Brackets of Token list
 
 open System
 
 let az = set ['a';'b';'c';'d';'e';'f';'g';'h';'i';'j';'k';'l';'m';'n';'o';'p';'q';'r';'s';'t';'u';'v';'w';'x';'y';'z']
+
 let contains x = Seq.exists ((=) x)
-let rec tokens acc = function
-    // ignore extra whitespace
-    | w :: t when Char.IsWhiteSpace(w) -> tokens acc t
-    // empty codes
-    | ';' :: t -> tokens ( Token.StatementSeperator :: acc)  t
-    | ':' :: '=' :: t -> tokens (Token.Assignment :: acc) t
-    | '(' :: t -> tokens (Token.LBracket::acc) t
-    | ')' :: t -> tokens (Token.Rbracket::acc) t
-    | '<' :: '=' :: t -> tokens(Token.LTEquals::acc) t
-    | '+' :: t -> tokens (Token.Addition::acc) t
-    | 'w'::'h'::'i'::'l'::'e'::t -> tokens (Token.While::acc) t
-    | 'd'::'o'::t -> tokens (Token.Do::acc) t
-    // numbers
-    | d :: t when Char.IsDigit(d) -> 
-        // t' is the remaining string after the number, n is the number
-        let rec parseInteger acc = function
+
+let rec hasNoMoreIdentifier = function
+    |   a::t when Char.IsWhiteSpace(a) -> true
+    |   a::t when contains a az -> false
+    |   _ -> true
+
+let rec parseInteger acc = function
             | '0' :: t  -> parseInteger (acc*10) t
             | '1' :: t  -> parseInteger (acc*10 + 1) t
             | '2' :: t  -> parseInteger (acc*10 + 2) t
@@ -45,6 +58,39 @@ let rec tokens acc = function
             | '9' :: t  -> parseInteger (acc*10 + 9) t
             | [] -> [], acc
             | t -> t, acc
+
+let rec tokens acc = function
+    // empty codes
+    | ';' :: t -> tokens ( Token.StatementSeperator :: acc)  t
+    | ':' :: '=' :: t -> tokens (Token.Assignment :: acc) t
+    | '(' :: t -> tokens (Token.LBracket::acc) t
+    | ')' :: t -> tokens (Token.Rbracket::acc) t
+    | '<' :: '=' :: t -> tokens(Token.LTEquals::acc) t
+    | '*' :: t -> tokens(Token.Multiply::acc) t
+    | '!' :: t -> tokens(Token.Not::acc) t
+    | '&' :: '&' :: t -> tokens(Token.Not::acc) t
+    | '=' :: t -> tokens(Token.Equals::acc) t
+    | '+' :: t -> tokens (Token.Addition::acc) t
+    | '-' :: t -> tokens (Token.Subtraction::acc) t
+    | 'w'::'h'::'i'::'l'::'e'::t when hasNoMoreIdentifier t -> tokens (Token.While::acc) t
+    | 'd'::'o'::t when hasNoMoreIdentifier t -> tokens (Token.Do::acc) t
+    | 'i'::'f'::t when hasNoMoreIdentifier t -> tokens (Token.If::acc) t
+    | 't'::'r'::'u'::'e'::t when hasNoMoreIdentifier t -> tokens (Token.True::acc) t
+    | 'f'::'a'::'l'::'s'::'e'::t when hasNoMoreIdentifier t -> tokens (Token.False::acc) t
+    | 't'::'h'::'e'::'n'::t when hasNoMoreIdentifier t -> tokens (Token.Then::acc) t
+    | 'e'::'l'::'s'::'e'::t when hasNoMoreIdentifier t -> tokens(Token.Else::acc) t
+    | 's'::'k'::'i'::'p'::t when hasNoMoreIdentifier t -> tokens(Token.Skip::acc) t
+
+    // numbers
+    | (sp::'-'::d::t)  when Char.IsWhiteSpace(sp) ->
+        let t',n = parseInteger 0 (d::t)
+        tokens (Token.Number(-n)::acc) t'
+    
+    // ignore extra whitespace
+    | w :: t when Char.IsWhiteSpace(w) -> tokens acc t
+    
+    | ('+'::d::t)
+    | d :: t when Char.IsDigit(d) -> 
         let t',n = parseInteger 0 (d::t)
         tokens (Token.Number(n)::acc) t'
     // identifier
@@ -56,7 +102,7 @@ let rec tokens acc = function
         let t',i = parseIdentifier "" (c::t)
         tokens (Token.Identifier(i)::acc) t'
     | [] -> List.rev(acc)
-    | _ -> failwith "tokenisation error"
+    | err -> failwith "tokenisation error"
 
 
 
