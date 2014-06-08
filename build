@@ -1,0 +1,4 @@
+#!/bin/bash
+
+rm *.exe > /dev/null
+fsharpc Syntax.fs Parser.fs Runtime.fs Program.fs

@@ -1,7 +1,7 @@
 ﻿// x:=0;while (x<=10) do (x:=x+1)
 module Parser
-type Token = 
-    
+type Token =
+
     // statement
     | Assignment //
     | StatementSeperator //
@@ -15,12 +15,12 @@ type Token =
     | Skip //
 
     // arith
-    | Identifier of string //
+    | IdentifierToken of string //
     | Addition //
     | Subtraction //
     | Multiply //
     | Number of int//
-    
+
     // bools
     | LTEquals //
     | True//
@@ -29,8 +29,8 @@ type Token =
     | Not//
     | And//
 
-     
-    
+
+
     // added in after extra lex step
     | Brackets of Token list
 
@@ -85,28 +85,28 @@ let rec tokens acc = function
     | (sp::'-'::d::t)  when Char.IsWhiteSpace(sp) ->
         let t',n = parseInteger 0 (d::t)
         tokens (Token.Number(-n)::acc) t'
-    
+
     // ignore extra whitespace
     | w :: t when Char.IsWhiteSpace(w) -> tokens acc t
-    
+
     | ('+'::d::t)
-    | d :: t when Char.IsDigit(d) -> 
+    | d :: t when Char.IsDigit(d) ->
         let t',n = parseInteger 0 (d::t)
         tokens (Token.Number(n)::acc) t'
     // identifier
-    | c :: t when contains c az-> 
+    | c :: t when contains c az->
         let rec parseIdentifier (acc:string) = function
             | c :: t when contains c az -> parseIdentifier (acc + c.ToString()) t
             | [] -> [], acc
             | t -> t, acc
         let t',i = parseIdentifier "" (c::t)
-        tokens (Token.Identifier(i)::acc) t'
+        tokens (Token.IdentifierToken(i)::acc) t'
     | [] -> List.rev(acc)
     | err -> failwith "tokenisation error"
 
 
 
-let removeBrackets tokens = 
+let private removeBrackets tokens =
     let rec removeBrackets' level acc = function
         |   Token.LBracket :: t -> removeBrackets' (level+1) (Token.LBracket :: acc) t
         |   Token.Rbracket :: t when level = 1 -> (List.rev (Token.Rbracket::acc)),t
@@ -117,7 +117,7 @@ let removeBrackets tokens =
     let leftnobrackets = (left.Tail |> List.rev).Tail |> List.rev
     leftnobrackets,rest
 
-let composeBrackets tokens = 
+let private composeBrackets tokens =
     let rec cb acc = function
         |   LBracket  :: t ->
             let inside,rest = removeBrackets (LBracket::t)
@@ -127,9 +127,81 @@ let composeBrackets tokens =
         |   [] -> acc |> List.rev
         //|   _ -> failwith "error"
     cb [] tokens
-    
 
-let tokensWhile (s:string) = 
-    let chars = List.ofArray(s.ToCharArray()) 
+
+// takes a while program string and returns the tokens for the string or errors
+let tokensWhile (s:string) =
+    let chars = List.ofArray(s.ToCharArray())
     let toks = tokens [] chars
     composeBrackets toks
+
+
+let rec parseArithComplete = function
+        | Token.Number(n) :: [] -> Syntax.ArithExp.Int(n)
+        | Token.IdentifierToken(i) :: []-> Syntax.ArithExp.Var(i)
+        | Token.Brackets(t) :: [] -> parseArithComplete t
+        | a :: Token.Addition :: r ->
+            Syntax.ArithExp.Addition( parseArithComplete [a], parseArithComplete r )
+        | a :: Token.Subtraction :: r ->
+            Syntax.ArithExp.Subtraction( parseArithComplete [a], parseArithComplete r )
+        | a :: Token.Multiply :: r ->
+            Syntax.ArithExp.Multiply( parseArithComplete [a], parseArithComplete r )
+        | _ -> failwith "unexpected token"
+
+// this should parse all the tokens possible from the stream into an arithmetic expression  and return the rest
+let parseArith (t:Token list) =
+    // returns if token is arith
+    let arithToken = function
+        | Token.Addition | Token.Brackets(_) | Token.IdentifierToken(_)
+        | Token.Multiply | Token.Number(_) | Token.Subtraction -> true
+        | _ -> false
+    let rec seperateNextArith acc = function
+        | a :: r when not(arithToken a) -> (acc |> List.rev),(a::r)
+        | a :: r -> seperateNextArith (a :: acc) r
+        | [] -> (acc |> List.rev),[]
+        | _ -> failwith "unexpected token"
+    let getArithForOperand left right = function
+                | Token.Addition -> Syntax.ArithExp.Addition(left,right)
+                | Token.Multiply -> Syntax.ArithExp.Multiply(left,right)
+                | Token.Subtraction -> Syntax.ArithExp.Subtraction(left,right)
+                | _ -> failwith "expected operand"
+
+    let arithTokens,rest = seperateNextArith [] t
+    rest,(parseArithComplete arithTokens)
+
+// fortunatley the grammar of the language will seperate the bool expressions into complete sections
+// so all the passed tokens are to be used or fail horribley...
+
+// x=<10
+let rec parseBool = function
+    |   Token.True :: [] -> Syntax.BooleanExp.True
+    |   Token.False :: [] -> Syntax.BooleanExp.False
+    |   Token.Not :: r -> Syntax.BooleanExp.Not(parseBool r)
+    |   Token.Brackets(a) :: [] -> parseBool a
+    |   l :: Token.LTEquals :: r -> Syntax.BooleanExp.LTEquals(parseArithComplete [l],parseArithComplete r)
+    |   l :: Token.And :: r -> Syntax.BooleanExp.And(parseBool [l],parseBool r)
+    |   l :: Token.Equals :: r -> Syntax.BooleanExp.Equals(parseArithComplete [l],parseArithComplete r)
+    | _ -> failwith "unexpected token"
+
+let rec parseStatement tokens =
+    let concatOrEnd newstatement = function
+        | [] -> newstatement
+        | StatementSeperator :: restrest -> Syntax.Statement.StatementConcat(newstatement,parseStatement restrest)
+        | _ -> failwith "statement concatination expected"
+    match tokens with
+      // assignment
+      |   Token.IdentifierToken(x) :: Assignment :: t ->
+              let rest,arith = parseArith t
+              concatOrEnd (Syntax.Statement.Assignment(x,arith)) rest
+      // while
+      |   Token.While :: Token.Brackets(bool) :: Do :: Brackets(stmt) :: t ->
+              concatOrEnd (Syntax.Statement.While(parseBool bool,parseStatement stmt)) t
+      // if
+      |   Token.If :: Token.Brackets(bool) :: Then :: Brackets(s1) :: Else:: Brackets(s2)::t->
+              concatOrEnd (Syntax.Statement.If(parseBool bool,parseStatement s1,parseStatement s2)) t
+      // skip
+      |   Token.Skip :: t-> concatOrEnd Syntax.Statement.Skip t
+      |   [] -> Syntax.Statement.Skip
+      |   _ -> failwith "unexpected token"
+
+let public stringToStatement input = input |> tokensWhile |> parseStatement
