@@ -43,5 +43,5 @@ type Context =
               else this.Compute sfalse
           | While(b,s) ->
               let mutable cur = this
-              while (this.Value b) do cur <- cur.Compute s
+              while (cur.Value b) do cur <- cur.Compute s
               cur
