@@ -1,19 +1,17 @@
-# WhileFS (a super simple programming language from COMP12112 UOM)
-##### a little project to help me understand a simple lexer / parser/ AST package
-##### with a little runtime thrown in for lulz
+# WhileFS (Lexer / Parser / AST)
+(a super simple programming language from COMP12112 UOM)
+(somthing to help me learn and experiment)
 
-### dependancies
-This project is in f# and so you will need the mono compiler available for download
-[here](http://www.go-mono.com/mono-downloads/download.html)
+### while programming language
 
-### building
-you can run `$ build`
-or alternativeley you can run 
+this is a simple language with an easy to understand grammar and syntax and is [turing complete!](http://en.wikipedia.org/wiki/Turing_completeness)
+
 ```
-$ fsharpc Syntax.fs Parser.fs Runtime.fs Program.fs
-```
+x:=0 // assignment
+if(x<=10) then (a:=1) else (a:=0) // if 
+while(a<=10) do (a:=a*2) // while
 
-you can individually compile these from left to right also
+```
 
 ### running!!
 you can give it a go with some of the samples below
@@ -31,6 +29,21 @@ $ mono Program.exe "
       (fail:=0)
 "
 ```
+
+
+
+### dependancies
+This project is in f# and so you will need the mono compiler available for download
+[here](http://www.go-mono.com/mono-downloads/download.html)
+
+### building
+you can run `$ build`
+or alternativeley you can run 
+```
+$ fsharpc Syntax.fs Parser.fs Runtime.fs Program.fs
+```
+
+you can individually compile these from left to right also
 
 ### a little explaination
 
