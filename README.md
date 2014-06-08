@@ -10,7 +10,6 @@ this is a simple language with an easy to understand grammar and syntax and is [
 x:=0 // assignment
 if(x<=10) then (a:=1) else (a:=0) // if 
 while(a<=10) do (a:=a*2) // while
-
 ```
 
 ### running!!
