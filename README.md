@@ -15,11 +15,18 @@ you can individually compile these from left to right also
 you can give it a go with some of the samples below
 
 ```
-x:=0
+$ mono Program.exe "x:=10"
+$ mono Program.exe "x:=10;x:=x-5"
+```
+
+```
+$ mono Program.exe "
+x:=0;
 while(x<=10) do
-  (x:=x-1)
+  (x:=x-1);
 if(x<10) then
   (fail:=1)
   else
   (fail:=0)
+"
 ```
